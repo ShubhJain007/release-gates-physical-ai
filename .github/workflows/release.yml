@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   paper:
@@ -24,23 +22,30 @@ jobs:
           tectonic-version: latest
       - name: Compile
         working-directory: paper
-        run: tectonic -X compile main.tex --outdir build --keep-logs
+        run: |
+          mkdir -p build
+          tectonic -X compile main.tex --outdir build --keep-logs --keep-intermediates
       - name: Fail on undefined citations
         working-directory: paper
         run: |
           if grep -q "Citation .* undefined" build/main.log; then
-            echo "undefined citations present"; grep "Citation .* undefined" build/main.log; exit 1
+            echo "::error::undefined citations present"
+            grep "Citation .* undefined" build/main.log
+            exit 1
           fi
-      - name: Stage PDF for the site
-        run: cp paper/build/main.pdf docs/release-gates-physical-ai.pdf
+          echo "all citations resolved"
+      - name: Assemble arXiv package
+        working-directory: paper
+        run: |
+          mkdir -p ../dist
+          cp main.tex refs.bib build/main.bbl ../dist/
+          tar czf arxiv-submission.tar.gz -C ../dist main.tex refs.bib main.bbl
       - uses: actions/upload-artifact@v4
         with:
-          name: paper-pdf
-          path: docs/release-gates-physical-ai.pdf
-      - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        with:
-          path: docs
+          name: paper
+          path: |
+            paper/build/main.pdf
+            paper/arxiv-submission.tar.gz
 
   schema:
     name: Validate evidence records
@@ -54,15 +59,16 @@ jobs:
         run: python3 -c "import json;json.load(open('schema/evidence.schema.json'));print('schema ok')"
       - name: Records validate
         run: python3 tools/validate_evidence.py schema/example-record.json schema/example-advisory-record.json
-
-  deploy:
-    name: Deploy project page
-    needs: [paper, schema]
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Gating invariant is enforced
+        run: |
+          python3 - <<'PY'
+          import json
+          r = json.load(open('schema/example-advisory-record.json'))
+          r['fidelity']['gating_authority'] = 'gating'   # rho 0.52 < tau: must be rejected
+          json.dump(r, open('/tmp/bad.json', 'w'))
+          PY
+          if python3 tools/validate_evidence.py /tmp/bad.json; then
+            echo "::error::validator accepted a record claiming unearned gating authority"
+            exit 1
+          fi
+          echo "invariant enforced"
