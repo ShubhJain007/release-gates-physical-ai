@@ -1,0 +1,68 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  paper:
+    name: Build paper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tectonic
+        uses: wtfjoke/setup-tectonic@v3
+        with:
+          tectonic-version: latest
+      - name: Compile
+        working-directory: paper
+        run: tectonic -X compile main.tex --outdir build --keep-logs
+      - name: Fail on undefined citations
+        working-directory: paper
+        run: |
+          if grep -q "Citation .* undefined" build/main.log; then
+            echo "undefined citations present"; grep "Citation .* undefined" build/main.log; exit 1
+          fi
+      - name: Stage PDF for the site
+        run: cp paper/build/main.pdf docs/release-gates-physical-ai.pdf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paper-pdf
+          path: docs/release-gates-physical-ai.pdf
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          path: docs
+
+  schema:
+    name: Validate evidence records
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Schema parses
+        run: python3 -c "import json;json.load(open('schema/evidence.schema.json'));print('schema ok')"
+      - name: Records validate
+        run: python3 tools/validate_evidence.py schema/example-record.json schema/example-advisory-record.json
+
+  deploy:
+    name: Deploy project page
+    needs: [paper, schema]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

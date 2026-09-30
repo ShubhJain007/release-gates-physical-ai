@@ -1,0 +1,24 @@
+# LaTeX build intermediates
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+paper/build/
+
+# Tectonic cache
+.tectonic/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# generated submission package
+paper/arxiv-submission.tar.gz
+dist/

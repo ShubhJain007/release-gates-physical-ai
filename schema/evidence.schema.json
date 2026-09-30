@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/release-gates/evidence.schema.json",
+  "title": "Evidence record",
+  "description": "Definition 2 of 'Release Gates for Physical AI': e = (t, r, S, y, rho, p). One immutable record per test execution, scoped to a release.",
+  "type": "object",
+  "required": ["record_id", "release", "test", "runner", "system_under_test", "outcome", "fidelity", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "record_id": { "type": "string", "description": "Stable unique id; content hash recommended." },
+    "release": {
+      "type": "object",
+      "required": ["id", "created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "examples": ["4.2.0"] },
+        "baseline_id": { "type": "string", "description": "Release this candidate is compared against." },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "test": {
+      "type": "object",
+      "required": ["id", "family", "task"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "family": { "enum": ["functional", "adversarial", "cyber", "hardware"] },
+        "task": { "type": "string", "description": "Task family or, for cyber, the control under test." },
+        "spec_version": { "type": "string" },
+        "tolerance": {
+          "type": "object",
+          "description": "Regression tolerance beyond which a gating test blocks.",
+          "additionalProperties": false,
+          "properties": {
+            "metric": { "type": "string" },
+            "max_regression": { "type": "number" },
+            "unit": { "enum": ["percentage_points", "count", "seconds", "millimetres", "ratio"] }
+          }
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["calibrated_sim", "log_replay", "hardware_in_loop", "physical_cell", "static_analysis"] },
+        "engine": { "type": "string", "examples": ["genesis", "newton", "mujoco", "isaac_sim"] },
+        "engine_version": { "type": "string" },
+        "episodes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "system_under_test": {
+      "type": "object",
+      "description": "The tuple S = (h, pi, sigma, c) of Definition 1. Evidence is valid only for this tuple.",
+      "required": ["hardware", "policy", "stack", "site"],
+      "additionalProperties": false,
+      "properties": {
+        "hardware": {
+          "type": "object",
+          "required": ["platform"],
+          "additionalProperties": false,
+          "properties": {
+            "platform": { "type": "string" },
+            "end_effector": { "type": "string" },
+            "degradation_index": {
+              "type": "number", "minimum": 0, "maximum": 1,
+              "description": "0 = as-new, 1 = at service limit. Enables the stratification in section 4.6."
+            },
+            "hours_since_service": { "type": "number", "minimum": 0 }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "required": ["checkpoint_id"],
+          "additionalProperties": false,
+          "properties": {
+            "checkpoint_id": { "type": "string" },
+            "weights_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$",
+              "description": "Model weights treated as an SBOM component (section 4.5)." },
+            "architecture": { "type": "string" },
+            "training_data_provenance_class": { "enum": ["internal", "licensed", "public", "mixed", "undisclosed"] }
+          }
+        },
+        "stack": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "firmware_version": { "type": "string" },
+            "sbom_ref": { "type": "string", "description": "Pointer to the machine-readable SBOM for this release." }
+          }
+        },
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "site_id": { "type": "string" },
+            "cell_id": { "type": "string" },
+            "item_catalogue_version": { "type": "string" }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["metric", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "metric": { "type": "string", "examples": ["success_rate", "attack_success_rate", "unresolved_exposures", "degradation_index"] },
+        "value": { "type": "number" },
+        "baseline_value": { "type": "number" },
+        "delta": { "type": "number" },
+        "ci95": {
+          "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2,
+          "description": "Lower and upper bound of the 95% interval."
+        },
+        "n": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "fidelity": {
+      "type": "object",
+      "description": "Predictive validity of this (test, runner) pair. Determines gating authority (Definition 3).",
+      "required": ["rho", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "rho": { "type": "number", "minimum": -1, "maximum": 1 },
+        "method": { "enum": ["spearman_vs_real", "pearson_vs_real", "not_established"] },
+        "checkpoints_used": { "type": "integer", "minimum": 0 },
+        "max_rank_violation": { "type": "number", "minimum": 0 },
+        "gating_authority": {
+          "enum": ["gating", "advisory"],
+          "description": "MUST be 'advisory' unless rho >= tau and n >= n_min."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["created_at", "created_by"],
+      "additionalProperties": false,
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "description": "Human or service account." },
+        "seed": { "type": "integer" },
+        "inputs_digest": { "type": "string", "description": "Hash over the test inputs, for re-execution." },
+        "code_ref": { "type": "string", "description": "Commit of the harness that produced this record." },
+        "immutable": { "const": true }
+      }
+    }
+  }
+}

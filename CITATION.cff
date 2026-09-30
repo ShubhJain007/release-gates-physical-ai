@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: "Release Gates for Physical AI: A Unified Framework for Functional, Adversarial, Cyber, and Hardware Verification of Learned Robot Systems"
+message: "If you use this framework or its evidence schema, please cite the preprint."
+type: software
+version: 0.1.0
+date-released: "2026-09-30"
+license: MIT
+license-url: "https://opensource.org/licenses/MIT"
+abstract: >-
+  A framework for composing functional, adversarial, cybersecurity and hardware
+  verification of learned robot policies into a single release decision, with a
+  fidelity-gating rule that permits a test to block a release only once its predictive
+  validity against real outcomes has been measured.
+keywords:
+  - robotics
+  - verification and validation
+  - vision-language-action models
+  - adversarial robustness
+  - functional safety
+authors:
+  - given-names: Shubh
+    family-names: Jain
+    affiliation: Carnegie Mellon University
+    email: shubhj@andrew.cmu.edu
+preferred-citation:
+  type: report
+  title: "Release Gates for Physical AI: A Unified Framework for Functional, Adversarial, Cyber, and Hardware Verification of Learned Robot Systems"
+  year: 2026
+  month: 9
+  institution:
+    name: Carnegie Mellon University
+  authors:
+    - given-names: Shubh
+      family-names: Jain

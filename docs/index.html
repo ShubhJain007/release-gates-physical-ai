@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release Gates for Physical AI</title>
+<meta name="description" content="A unified framework for functional, adversarial, cyber, and hardware verification of learned robot systems. Preprint and reference evidence schema.">
+<meta property="og:title" content="Release Gates for Physical AI">
+<meta property="og:description" content="A test earns the right to block a release by demonstrating predictive validity, not by looking realistic.">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600&family=JetBrains+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="stamp">
+    <span><b>Preprint</b> · not peer reviewed</span>
+    <span>v0.1.0</span>
+    <span>30 September 2026</span>
+    <span>Systems &amp; Robotics</span>
+  </div>
+  <h1>Release Gates for Physical AI</h1>
+  <p class="sub">A unified framework for functional, adversarial, cyber, and hardware verification of learned robot systems</p>
+  <p class="byline"><em>Shubh Jain</em> · Carnegie Mellon University · <span style="font-family:var(--mono);font-size:.9em">shubhj@andrew.cmu.edu</span></p>
+  <nav class="links">
+    <a class="primary" href="release-gates-physical-ai.pdf">Paper (PDF)</a>
+    <a href="https://github.com/">Code &amp; source</a>
+    <a href="../schema/evidence.schema.json">Evidence schema</a>
+    <a href="#bibtex">BibTeX</a>
+  </nav>
+  <div class="notice">
+    <p><strong>Status.</strong> Framework and position paper. No new experimental results. Every quantitative figure is attributed to published work or a named standard; every threshold proposed is labelled as a proposal.</p>
+    <p><strong>Scope.</strong> Manipulation and station-based mobile manipulation. Locomotion, whole-body balance and public-road autonomy are out of scope.</p>
+  </div>
+</header>
+
+<main>
+
+<section id="abstract">
+  <h2 class="sec"><span></span>Abstract</h2>
+  <p>Learned manipulation policies are now updated on the cadence of software, shipped to fleets monthly, and evaluated with the rigour of a demo. Classical machine-safety verification assumes a deterministic controller whose behaviour can be argued from its structure; a vision-language-action policy offers neither determinism nor structure, and its competence is a property of a distribution rather than of a program. The decision to deploy a new policy version is consequently made today without a coherent body of evidence.</p>
+  <p>The evidence bearing on that decision already exists in four separate literatures and four separate industrial practices — functional evaluation, adversarial robustness, product cybersecurity, and hardware reliability — and no framework composes them. We propose one: a test taxonomy for the release decision, a <em>fidelity-gating</em> principle, a release-scoped immutable evidence model mapped to ISO 10218:2025 and EU Cyber Resilience Act obligations, and an evaluation protocol for the framework itself.</p>
+</section>
+
+<section id="idea">
+  <h2 class="sec"><span>1</span>The rule</h2>
+  <div class="callout">
+    <span class="label">Fidelity gating</span>
+    <p>A test may block a release only once its predictive validity against real outcomes has been measured. Otherwise it reports as advisory. Apparent realism is not a qualification.</p>
+  </div>
+  <p>This matters more in robotics than in software testing, because a robotics test can look extremely convincing and still be uninformative. A photorealistic scene with guessed friction coefficients produces confident, wrong rankings — which is precisely the configuration current automated real-to-sim pipelines ship in, since they obtain mass and friction by querying a vision-language model rather than measuring them.</p>
+  <p>Fidelity gating also makes low-fidelity tests safe to keep. A cable-routing suite at ρ = 0.5 still surfaces a large regression worth a real-world check; under a naive gate it would either block releases spuriously or be deleted.</p>
+</section>
+
+<section id="framework">
+  <h2 class="sec"><span>2</span>Framework</h2>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 880 260" role="img" aria-label="Pipeline: system under test, four test families, five runners, evidence store, release gate and compliance pack.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--rule-firm)"/>
+          </marker>
+        </defs>
+        <g font-family="Archivo, sans-serif" font-size="12.5" fill="var(--ink)">
+          <rect x="8" y="92" width="132" height="74" fill="var(--wash)" stroke="var(--accent)"/>
+          <text x="22" y="114" font-size="11" fill="var(--accent)" font-weight="600">SYSTEM UNDER TEST</text>
+          <text x="22" y="134">h · π · σ · c</text>
+          <text x="22" y="152" font-size="11" fill="var(--ink-2)">hardware, policy, stack, site</text>
+
+          <text x="186" y="26" font-size="11" fill="var(--ink-2)" font-weight="600">TEST FAMILIES</text>
+          <rect x="182" y="36" width="140" height="32" fill="var(--surface)" stroke="var(--rule-firm)"/><text x="195" y="57">Functional</text>
+          <rect x="182" y="76" width="140" height="32" fill="var(--surface)" stroke="var(--rule-firm)"/><text x="195" y="97">Adversarial</text>
+          <rect x="182" y="116" width="140" height="32" fill="var(--surface)" stroke="var(--rule-firm)"/><text x="195" y="137">Cyber</text>
+          <rect x="182" y="156" width="140" height="32" fill="var(--surface)" stroke="var(--rule-firm)"/><text x="195" y="177">Hardware</text>
+
+          <text x="366" y="26" font-size="11" fill="var(--ink-2)" font-weight="600">RUNNERS</text>
+          <rect x="362" y="36" width="146" height="152" fill="none" stroke="var(--rule)" stroke-dasharray="3 3"/>
+          <text x="375" y="58" font-size="11.5" fill="var(--ink-2)">calibrated sim</text>
+          <text x="375" y="80" font-size="11.5" fill="var(--ink-2)">log replay</text>
+          <text x="375" y="102" font-size="11.5" fill="var(--ink-2)">hardware-in-loop</text>
+          <text x="375" y="124" font-size="11.5" fill="var(--ink-2)">physical cell</text>
+          <text x="375" y="146" font-size="11.5" fill="var(--ink-2)">static analysis</text>
+          <text x="375" y="172" font-size="11" fill="var(--ink-2)">each emits ρ</text>
+
+          <rect x="550" y="72" width="140" height="112" fill="var(--surface)" stroke="var(--rule-firm)" stroke-width="1.5"/>
+          <text x="563" y="96" font-size="11" fill="var(--ink-2)" font-weight="600">EVIDENCE STORE</text>
+          <text x="563" y="118">immutable</text>
+          <text x="563" y="138">release-scoped</text>
+          <text x="563" y="158">fidelity-tagged</text>
+          <text x="563" y="176" font-size="11" fill="var(--ink-2)">e = (t,r,S,y,ρ,p)</text>
+
+          <rect x="722" y="48" width="146" height="52" fill="var(--pass-wash)" stroke="var(--pass)"/>
+          <text x="735" y="70" font-size="11" fill="var(--pass)" font-weight="600">RELEASE GATE</text>
+          <text x="735" y="90">pass · block · advise</text>
+          <rect x="722" y="132" width="146" height="52" fill="var(--surface)" stroke="var(--rule-firm)"/>
+          <text x="735" y="154" font-size="11" fill="var(--ink-2)" font-weight="600">COMPLIANCE PACK</text>
+          <text x="735" y="174">clause-mapped</text>
+
+          <g stroke="var(--rule-firm)" stroke-width="1.2" fill="none" marker-end="url(#ar)">
+            <path d="M144 129 L176 129"/>
+            <path d="M326 52 L356 52"/><path d="M326 92 L356 92"/>
+            <path d="M326 132 L356 132"/><path d="M326 172 L356 172"/>
+            <path d="M512 110 L544 110"/>
+            <path d="M694 116 L714 82"/><path d="M694 144 L714 158"/>
+          </g>
+          <path d="M650 196 C 500 238, 210 238, 74 178" stroke="var(--accent)" stroke-width="1.2" fill="none" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+          <text x="196" y="232" font-size="11" fill="var(--ink-2)">field failures and degradation telemetry re-enter as new test specifications</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1</b> — Four test families execute on five runner types; every result carries a fidelity estimate that decides whether it may block a release. The evidence store is the system of record from which both the gate decision and the clause-mapped compliance pack derive.</figcaption>
+  </figure>
+
+  <h3>Test families</h3>
+  <figure>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Family</th><th>Primary metric</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Functional</td><td>Success-rate delta vs. baseline, per task family, with interval</td><td><span class="chip gate">Gating</span> rigid tasks; <span class="chip adv">Advisory</span> deformable, insertion</td></tr>
+          <tr><td>Adversarial</td><td>Attack success rate per category, pre/post mitigation</td><td><span class="chip gate">Gating</span> — directly observed</td></tr>
+          <tr><td>Cyber</td><td>Unresolved exposure by severity; time-to-evidence</td><td><span class="chip gate">Gating</span> — deterministic, mandated</td></tr>
+          <tr><td>Hardware</td><td>Degradation index; projected service interval</td><td><span class="chip adv">Advisory</span> — coupling to task success unmodelled</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><b>Table 1</b> — Status reflects the authors' assessment against the surveyed literature, not a measured result. Two of four families cannot presently gate on contact-rich work.</figcaption>
+  </figure>
+</section>
+
+<section id="metrics">
+  <h2 class="sec"><span>3</span>Thresholds, stated so they can be falsified</h2>
+  <figure>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Metric</th><th class="num">Proposed</th><th>Basis</th></tr></thead>
+        <tbody>
+          <tr><td>Suite fidelity ρ (rank correlation, ≥8 checkpoints)</td><td class="num">≥ 0.80</td><td>Anchored to 0.887–0.911 reported by current real-to-sim systems</td></tr>
+          <tr><td>Maximum rank violation</td><td class="num">≤ 0.05</td><td>0.018 and 0.0066 reported in prior work</td></tr>
+          <tr><td>Verifier balanced accuracy, split by contact intensity</td><td class="num">≥ 0.90</td><td>Best published: 0.77 overall, below 0.60 on contact-intensive</td></tr>
+          <tr><td>Regression catch rate on known field regressions</td><td class="num">≥ 0.80</td><td>The retrospective study in §6 would establish it</td></tr>
+          <tr><td>Time-to-evidence per release</td><td class="num">≤ 24 h</td><td>Set by release cadence, not by technique</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figcaption><b>Table 2</b> — Full metric set, definitions and citations appear in §5 of the paper.</figcaption>
+  </figure>
+</section>
+
+<section id="protocol">
+  <h2 class="sec"><span>4</span>How to test the framework</h2>
+  <ol>
+    <li><strong>Retrospective gate study.</strong> Take a fleet's last N checkpoints, their real outcomes and known field regressions. Build suites blind to the outcomes, compute ρ, apply the gate, and report rank correlation, catch rate and false-block rate. This is the load-bearing experiment.</li>
+    <li><strong>Adversarial pre/post.</strong> Instantiate four published attack categories, measure success, apply a guard, re-measure, and report simulated-to-physical transfer.</li>
+    <li><strong>Cross-family interaction.</strong> Measure functional and attack success jointly; stratify functional failures by hardware degradation index.</li>
+    <li><strong>Budget allocation.</strong> With fixed physical-cell hours, compare uniform, fidelity-weighted and uncertainty-weighted allocation against random sampling.</li>
+  </ol>
+</section>
+
+<section id="open">
+  <h2 class="sec"><span>5</span>The dependency that decides it</h2>
+  <p class="lead">The functional leg rests on success detection, and published success detectors are near chance exactly where industrial value concentrates. We believe the missing evidence is non-visual — wrist force/torque, joint effort, vacuum pressure, tactile — and that verifier design should be multimodal rather than vision-only. That is a claim in this paper, not a result.</p>
+  <p>The remaining open problems, treated in §7: calibrating fidelity without historical checkpoints, identifying physical parameters from interaction logs instead of language-model priors, the compute budget of verification-time scaling, standards coverage for learned components, and data protection as a constraint on sharing evidence.</p>
+</section>
+
+<section id="bibtex">
+  <h2 class="sec"><span>6</span>Citation</h2>
+  <pre class="bib" id="bibsrc">@techreport{releasegates2026,
+  title       = {Release Gates for Physical AI: A Unified Framework for Functional,
+                 Adversarial, Cyber, and Hardware Verification of Learned Robot Systems},
+  author      = {Jain, Shubh},
+  institution = {Carnegie Mellon University},
+  year        = {2026},
+  month       = sep,
+  note        = {Preprint, version 0.1.0}
+}</pre>
+  <button class="copy" id="copybtn" type="button">Copy BibTeX</button>
+</section>
+
+</main>
+
+<footer>
+  <p>Preprint draft, 30 September 2026. Paper and figures under CC BY 4.0; schema and code under MIT. Prepared as a preprint; comments and disagreements about the thresholds in Table 2 are welcome by email.</p>
+  <p>Quantitative claims attributed to third-party work retain that work's own limitations.</p>
+</footer>
+
+</div>
+<script>
+  document.getElementById('copybtn').addEventListener('click', function () {
+    var text = document.getElementById('bibsrc').textContent;
+    var btn = this;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = 'Copy BibTeX'; }, 1600);
+    }).catch(function () {
+      var r = document.createRange();
+      r.selectNodeContents(document.getElementById('bibsrc'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      btn.textContent = 'Selected — press ⌘/Ctrl+C';
+    });
+  });
+</script>
+</body>
+</html>

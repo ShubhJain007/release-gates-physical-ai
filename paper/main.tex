@@ -1,0 +1,564 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1.15in]{geometry}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{microtype}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=paperblue,citecolor=paperblue,urlcolor=paperblue]{hyperref}
+
+\definecolor{paperblue}{RGB}{42,79,168}
+\definecolor{rulegray}{RGB}{140,146,158}
+\definecolor{washblue}{RGB}{232,237,248}
+
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
+
+\bibliographystyle{plainnat}
+\setlength{\bibsep}{4pt}
+\setlist{itemsep=2pt,topsep=4pt}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+\newcommand{\sut}{\ensuremath{S}}
+\newcommand{\term}[1]{\emph{#1}}
+
+\title{\vspace{-2.2em}\textbf{Release Gates for Physical AI}\\[0.35em]
+\large A Unified Framework for Functional, Adversarial, Cyber, and Hardware\\
+Verification of Learned Robot Systems}
+
+\author{Shubh Jain\\ \small Carnegie Mellon University \\ \small\texttt{shubhj@andrew.cmu.edu}}
+
+\date{\small Preprint v0.1.0 \quad\textbullet\quad 30 September 2026 \quad\textbullet\quad Not peer reviewed}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\fcolorbox{rulegray}{washblue}{%
+\begin{minipage}{0.92\textwidth}
+\small
+\textbf{Status.} This is a framework and position paper. It contains no new experimental
+results. Every quantitative figure is attributed to published work or to a named standard;
+every threshold proposed here is labelled as a proposal and is not yet validated.
+\textbf{Scope.} Manipulation and station-based mobile manipulation. Locomotion, whole-body
+balance, and public-road autonomy are out of scope.
+\end{minipage}}
+\end{center}
+
+\begin{abstract}
+\noindent Learned manipulation policies are now updated on the cadence of software, shipped
+to fleets monthly, and evaluated with the rigour of a demo. Classical machine-safety
+verification assumes a deterministic controller whose behaviour can be argued from its
+structure; a vision-language-action policy offers neither determinism nor structure, and its
+competence is a property of a distribution rather than of a program. The decision to deploy
+a new policy version is consequently made today without a coherent body of evidence.
+
+We observe that the evidence bearing on that decision already exists in four separate
+literatures and four separate industrial practices---functional evaluation, adversarial
+robustness, product cybersecurity, and hardware reliability---and that no framework
+composes them. We propose one. Our contributions are: (i) a taxonomy of the four test
+families that bear on a release decision, with the metrics each can produce; (ii) a
+\term{fidelity-gating} principle, under which a test may block a release only once its
+predictive validity against real outcomes has been measured, and otherwise reports as
+advisory; (iii) a release-scoped, immutable evidence model mapped to the clauses of
+ISO~10218:2025 and the EU Cyber Resilience Act, including the treatment of model weights as
+components of a software bill of materials; and (iv) an evaluation protocol for the
+framework itself, centred on a retrospective study that asks whether a proposed gate would
+have caught regressions that actually reached the field.
+
+We further argue that the composition is not merely administrative: several failure modes
+are visible only across families---a policy version that improves task success while
+becoming more susceptible to in-scene prompt injection, or whose grasp failures concentrate
+on units whose end-effectors are past a wear threshold---and are structurally invisible to
+any single-family evaluation.
+\end{abstract}
+
+\section{Introduction}
+
+A robot deployment running a learned policy carries two independent kinds of uncertainty:
+whether the policy will do the task, and whether the surrounding system will behave when
+something adversarial, degraded, or unforeseen occurs. Industrial practice has mature
+answers for neither, and no answer at all for their interaction.
+
+The immediate cause is cadence. A fleet running a vision-language-action (VLA) policy
+receives new weights monthly or faster. The governing safety standard for industrial robot
+applications was revised in 2025 to accommodate, among other things, machinery incorporating
+machine-learning functions that alter behaviour over time
+\citep{iso102181,iso102182}, but conformity assessment remains an event rather than a
+subscription. Between two certified states a policy may change behaviour substantially, and
+nothing in the classical process observes that change.
+
+The deeper cause is epistemic. Functional safety argues from structure: a speed-and-separation
+monitor can be shown to be correct. A learned policy has no structure to argue from, so its
+competence must be \term{measured}, on a distribution, repeatedly. Measurement of that kind
+produces evidence with an unfamiliar property: it is only as good as its own predictive
+validity. A simulated benchmark that does not rank policy versions the way reality ranks
+them is not weak evidence but misleading evidence, and a release process that treats the two
+alike is worse than one with no simulation at all.
+
+\subsection{The four silos}
+
+Ask a robot company for the evidence behind its last release and four disconnected artifacts
+arrive: a notebook of task success rates on held-out cells; a penetration-test report,
+usually more than a year old, that does not mention the policy; maintenance records in a
+separate system describing hardware whose degradation nobody has related to task
+performance; and a safety file at a notified body describing a configuration that predates
+the current weights.
+
+Each silo has a serious literature. Real-to-sim evaluation now reports rank correlations
+against real-robot outcomes of $0.911$ \citep{simfoundry} and $0.887$ \citep{robosnap}.
+Physical prompt injection has a systematic taxonomy and a 5{,}670-trial benchmark
+\citep{paperhijack}. Product cybersecurity has a regulation with dated obligations and
+defined artifacts \citep{cra}. Hardware reliability has an established engineering practice.
+What is missing is the composition, and the composition is where the release decision lives.
+
+\subsection{Contributions}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item A \textbf{test taxonomy for the release decision} (\S\ref{sec:families}): four
+  families, their runners, and the metrics each can produce with current published methods.
+  \item \textbf{Fidelity gating} (\S\ref{sec:gating}): a rule separating tests permitted to
+  block a release from tests permitted only to advise, based on measured predictive validity
+  rather than on apparent realism.
+  \item A \textbf{release-scoped evidence model} (\S\ref{sec:store}--\S\ref{sec:compliance})
+  with an explicit mapping to ISO~10218:2025 and CRA artifacts, including model weights as
+  SBOM components.
+  \item An \textbf{evaluation protocol for the framework} (\S\ref{sec:protocol}), centred on
+  a retrospective study of known field regressions.
+  \item A statement of \textbf{open problems} (\S\ref{sec:open}), the most consequential
+  being that the verifiers this framework depends on are, on contact-rich tasks, close to
+  unusable today \citep{failbench}.
+\end{enumerate}
+
+\section{Related work}
+
+\subsection{Functional evaluation}
+
+Evaluating a policy in simulation against real outcomes has moved from aspiration to
+measurement. SimplerEnv established visual-matching and variant-aggregation protocols for
+comparing simulated and real manipulation performance \citep{simplerenv}. Recent automated
+real-to-sim systems report correlation directly: SimFoundry builds simulation-ready scenes
+from RGB video and reports a mean Pearson correlation of $0.911$ with a maximum rank
+violation of $0.018$ across seven tasks and five policy types, at roughly five minutes of
+reconstruction per object, with $F_1$ between $0.81$ and $0.92$ fully automated and
+$0.93$--$0.99$ given about three minutes of per-object human refinement \citep{simfoundry}.
+RoboSnap reconstructs from a single image and reports a Pearson correlation of $0.887$ and
+successful replay of five of five real trajectories \citep{robosnap}. Both are explicit that
+physical parameters---mass, friction---are assigned by querying a vision-language model
+rather than measured; RoboSnap states that it includes no dedicated pipeline for automatic
+physical-parameter estimation \citep{robosnap}, and an earlier framework attributes its
+residual error to ``domain mismatch, mesh reconstruction errors, and discrepancies in
+material property estimates'' \citep{scanmatsim}.
+
+A second line replaces the simulator with a learned world model and scores policies inside
+it \citep{onexwm,gigaworld,dworldeval}. The trade is legibility: a learned evaluator yields
+no contact forces, no queryable state, and no counterfactual outside its training
+distribution, which makes it unsuitable as the substrate for cyber or hardware evidence even
+where its functional predictions are good.
+
+Underneath both sits an unresolved dependency: deciding whether an episode succeeded.
+FailBench evaluates thirteen VLM-based success detectors and finds the best reaching $0.77$
+mean balanced accuracy, degrading to below $0.60$---near chance---on contact-intensive
+assembly, with a systematic bias toward predicting success under ambiguous evidence; models
+fine-tuned for failure detection underperformed general-purpose VLMs \citep{failbench}. A
+companion survey catalogues verifier designs and their failure modes \citep{nofreechecker},
+and calibrated task-success confidence is an active target \citep{vlaconf}.
+
+\subsection{Adversarial robustness}
+
+Embodiment changes the adversarial threat model, because the consequence is physical and
+frequently irreversible \citep{vlasafety}. The sharpest current result is physical prompt
+injection: adversarial text placed in the robot's visual field acts as an indirect injection
+into a VLM planner's reasoning. Across 5{,}670 trials with a four-category
+taxonomy---indirect signage, task redefinition, authority impersonation, conflict
+injection---attack success reached $27.0\%$, $29.4\%$, and $5.0\%$ on three frontier models
+\citep{paperhijack}. Related work demonstrates trajectory-level redirection, in which the
+instruction still appears to specify the intended task while the physical outcome is changed
+\citep{trajredirect}, partially observable adversarial patches \citep{patchattack}, and
+interference through physical signals such as sound, light, and electromagnetic emission.
+
+Defensively, adversarial scenario generation is being formulated as a red-team/blue-team
+game \citep{advsynth}, boundary-focused sampling is used for failure discovery before
+deployment \citep{robogate}, and the formal-methods community has surveyed falsification for
+learned policies \citep{formalsurvey}. None of this work is packaged as release evidence.
+
+\subsection{Cybersecurity and standards}
+
+Two instruments set dates. The revised ISO~10218-1 and 10218-2, published in 2025, absorb
+collaborative requirements formerly in ISO/TS~15066 and add robot classifications with
+matching functional-safety requirements, safety-related cybersecurity requirements, and
+end-effector guidance \citep{iso102181,iso102182}. ISO~25785-1, the first standard written
+for dynamically stable industrial mobile robots---the humanoids and quadrupeds now entering
+warehouses---remained a committee draft in early 2026 \citep{iso25785}. Separately, the EU
+Cyber Resilience Act entered into force in December 2024; vulnerability and incident
+reporting obligations apply from 11 September 2026, and full compliance---CE marking,
+machine-readable SBOM, secure-by-design requirements, vulnerability handling, and security
+updates across the support period---from 11 December 2027, with penalties up to
+EUR~15M or $2.5\%$ of global turnover \citep{cra,cratimeline}.
+
+Vendor safety stacks have moved faster than the standards. Halos for Robotics, announced in
+June 2026, couples safety compute, sensor bridging, a safety OS, and an accredited
+inspection lab that prepares integrations for third-party certification against IEC~61508,
+ISO~13849, and ISO/IEC~TR~5469 \citep{halos}; FORT Robotics extends it with
+infrastructure-side sensing \citep{fort}. This is functional safety: it bounds harm to
+people, does not measure task competence, and does not address adversarial manipulation of
+the policy's inputs. Control-barrier formulations that embed ISO~10218 constraints directly
+in the controller \citep{cbfiso} share that boundary.
+
+\subsection{Hardware reliability and its coupling to policy}
+
+Industrial practitioners consistently identify actuation as the binding constraint: a
+full-body platform carries thirty or more degrees of freedom, each required to deliver
+repeatable torque across thousands of hours, and harmonic-drive flex-splines are subject to
+fatigue under exactly the cyclic loading that walking and repetitive assembly produce;
+end-effectors are reported as the most failure-prone and most expensive subsystem
+\citep{humanoidhw,humanoidchal}. Absent from the literature is the coupling: no published
+framework relates a measured degradation state---a suction cup past a wear threshold, a
+drifting camera extrinsic---to the task success of the specific policy version running on
+that unit. In deployment this coupling is routine, and it is the most common informal
+explanation for ``the same policy performs differently across sites.''
+
+\subsection{What no existing system composes}
+
+Independent evaluation infrastructure is emerging---community and hosted real-robot
+benchmarks \citep{roboarena,robochallenge}, low-cost reproducible rigs \citep{phail,replica}---and
+is converging on public leaderboards for functional performance. Industrial V\&V platforms in
+the adjacent automotive domain integrate reconstruction, scenario generation, and
+regulatory-grade reporting, with a published three-tier metric framework separating
+reconstruction fidelity, open-loop stack agreement, and closed-loop behavioural comparison
+against real drive data \citep{neuralsim,wfm}. We take that three-tier structure as prior art
+and generalise it, noting that its robotics analogue must additionally carry cyber and
+hardware evidence, because in manipulation the same release decision is gated on all four.
+
+\section{Problem statement}
+\label{sec:problem}
+
+\begin{definition}[System under test]
+A system under test is the tuple
+\begin{equation}
+  \sut = (h,\; \pi,\; \sigma,\; c)
+\end{equation}
+with $h$ the hardware configuration (kinematics, end-effector, sensors, and their measured
+degradation state), $\pi$ the policy checkpoint, $\sigma$ the software and firmware stack
+including model dependencies, and $c$ the site configuration (fixtures, item catalogue,
+lighting, network posture). A release changes at least one component; evidence is valid only
+for the tuple it was produced against.
+\end{definition}
+
+\begin{definition}[Evidence]
+An evidence record is
+\begin{equation}
+  e = (t,\; r,\; \sut,\; y,\; \rho,\; p)
+\end{equation}
+for test specification $t$, runner $r$, system under test $\sut$, outcome $y$, fidelity
+estimate $\rho$ for the pair $(t,r)$, and provenance $p$ (inputs, versions, seeds,
+operator). Records are immutable and scoped to a release.
+\end{definition}
+
+\begin{definition}[Gate]
+For a candidate $\sut'$ and baseline $\sut$, a family of tests partitions into a gating set
+$G$ and an advisory set $A$ by
+\begin{equation}
+  t \in G \iff \rho(t,r) \ge \tau \;\wedge\; n(t) \ge n_{\min}.
+\end{equation}
+The release is blocked if any $t \in G$ shows a regression beyond its tolerance. Tests in
+$A$ are reported with their fidelity and cannot block. We propose $\tau = 0.8$ as a
+rank-correlation threshold (\S\ref{sec:metrics}), by analogy with the $0.887$--$0.911$
+correlations reported by current real-to-sim systems \citep{simfoundry,robosnap}; the value
+requires empirical justification per domain.
+\end{definition}
+
+Three consequences follow. First, \textbf{fidelity is a property of a test--runner pair, not
+of a simulator}: the same engine may be gating-grade for a rigid pick and advisory-grade for
+cable routing. Second, \textbf{evidence expires} when any component of $\sut$ changes, which
+is why hardware degradation belongs inside the model rather than beside it. Third, \textbf{a
+release decision is a multiple-comparison problem} across tasks and families, and must be
+treated as such rather than as a single averaged score.
+
+\section{Framework}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  box/.style={draw=rulegray, fill=white, minimum height=7mm, text width=26mm, align=center, inner sep=2pt},
+  sut/.style={draw=paperblue, fill=washblue, minimum height=16mm, text width=26mm, align=center},
+  store/.style={draw=rulegray, line width=0.8pt, fill=white, minimum height=24mm, text width=28mm, align=center},
+  outbox/.style={draw=rulegray, fill=white, minimum height=10mm, text width=27mm, align=center},
+  arw/.style={-{Latex[length=1.6mm]}, draw=rulegray}
+]
+\node[sut] (s) {\textbf{SYSTEM UNDER TEST}\\[2pt] $h \cdot \pi \cdot \sigma \cdot c$};
+\node[box, right=9mm of s, yshift=13.5mm] (f1) {Functional};
+\node[box, right=9mm of s, yshift=4.5mm]  (f2) {Adversarial};
+\node[box, right=9mm of s, yshift=-4.5mm] (f3) {Cyber};
+\node[box, right=9mm of s, yshift=-13.5mm](f4) {Hardware};
+\node[draw=rulegray, dashed, right=8mm of f2, yshift=-4.5mm, minimum height=30mm, text width=25mm, align=left, inner sep=4pt] (run)
+  {calibrated sim\\ log replay\\ hardware-in-loop\\ physical cell\\ static analysis\\[3pt] \textit{each emits} $\rho$};
+\node[store, right=8mm of run] (ev) {\textbf{EVIDENCE STORE}\\[3pt] immutable\\ release-scoped\\ fidelity-tagged};
+\node[outbox, right=8mm of ev, yshift=8mm] (gate) {\textbf{RELEASE GATE}\\ pass $\cdot$ block $\cdot$ advise};
+\node[outbox, right=8mm of ev, yshift=-9mm] (pack) {\textbf{COMPLIANCE PACK}\\ clause-mapped};
+\draw[arw] (s.east) -- (f2.west);
+\draw[arw] (s.east) -- (f3.west);
+\draw[arw] (f1.east) -- ++(4mm,0);
+\draw[arw] (f4.east) -- ++(4mm,0);
+\draw[arw] (run.east) -- (ev.west);
+\draw[arw] (ev.east) -- (gate.west);
+\draw[arw] (ev.east) -- (pack.west);
+\draw[arw, dashed, draw=paperblue] (pack.south) -- ++(0,-6mm) -| (s.south);
+\end{tikzpicture}
+\caption{The release-gate pipeline. Four test families execute on five runner types; every
+result carries a fidelity estimate that determines whether it may block a release. The
+evidence store is the system of record from which both the gate decision and the
+clause-mapped compliance pack are derived. Field failures and degradation telemetry re-enter
+as new test specifications, scoped to the tuple on which they were observed.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Test families and their metrics}
+\label{sec:families}
+
+Table~\ref{tab:families} states what each family tests, where it can run today, and what it
+produces. The \term{status} column records our assessment of whether current published
+methods support gating-grade evidence, and is the honest content of this paper: two of four
+families cannot presently gate on contact-rich work.
+
+\begin{table}[t]
+\small
+\centering
+\begin{tabularx}{\textwidth}{@{}l X l X@{}}
+\toprule
+\textbf{Family} & \textbf{Tests} & \textbf{Primary metric} & \textbf{Status} \\
+\midrule
+Functional & Task success per family, cycle time, cross-task regression, field-failure replay
+  & Success-rate delta vs.\ baseline, per task family, with interval
+  & Gating for rigid tasks; advisory for deformable and insertion \\
+Adversarial & In-scene prompt injection, patches, OOD scenes, sensor interference, trajectory redirection
+  & Attack success rate per category, pre/post mitigation
+  & Gating: attack success is directly observed, not inferred \\
+Cyber & SBOM completeness incl.\ model artifacts, known-vulnerability exposure, update integrity, access paths
+  & Unresolved exposure count by severity; time-to-evidence
+  & Gating: deterministic, and externally mandated \\
+Hardware & Actuator and transmission wear, end-effector degradation, calibration drift, thermal envelope
+  & Degradation index and projected service interval
+  & Advisory: coupling to task success unmodelled (\S2.4) \\
+\bottomrule
+\end{tabularx}
+\caption{The four families. Status reflects the authors' assessment against the surveyed
+literature, not a measured result.}
+\label{tab:families}
+\end{table}
+
+\subsection{Runners}
+
+A runner is any mechanism that can execute a test specification and return an outcome: a
+calibrated simulator, replay of logged episodes against a policy, hardware-in-the-loop, a
+physical cell, or static analysis of the software stack. Runners are interchangeable within a
+family and are the unit at which fidelity is estimated. The framework deliberately does not
+privilege simulation. A test whose only trustworthy runner is a physical cell remains a
+first-class test; it is simply expensive, and its sampling budget must be allocated
+accordingly (\S\ref{sec:budget}).
+
+\subsection{Fidelity gating}
+\label{sec:gating}
+
+A test earns the right to block a release; it does not hold that right by default, and
+realism is not the qualification---predictive validity is. Operationally: for each
+test--runner pair, estimate the rank correlation between its outcomes and real outcomes
+across a set of historical checkpoints of the same system; report it with every result;
+permit gating only above $\tau$. This rule matters more in robotics than in software testing
+because a robotics test can look extremely convincing and still be uninformative---a
+photorealistic scene with guessed friction coefficients produces confident, wrong rankings,
+which is precisely the configuration current automated real-to-sim pipelines ship in
+\citep{simfoundry,robosnap,scanmatsim}.
+
+Fidelity gating has a second effect that we consider its main practical justification: it
+makes low-fidelity tests \term{safe to keep}. A cable-routing suite with $\rho = 0.5$ still
+surfaces a large regression worth a real-world check; under a naive gate it would either
+block releases spuriously or be deleted. Advisory status retains the signal while denying it
+authority.
+
+\subsection{Evidence store}
+\label{sec:store}
+
+The store is append-only, addressed by release, and holds provenance sufficient to re-run
+each record. Three properties are load-bearing. \textbf{Immutability}, because an audit that
+can be edited is not an audit. \textbf{Release scoping}, so a query returns ``what did we
+know when we shipped 4.2'' rather than a current-state view. \textbf{Fidelity tagging}, so
+the gate rule is computable from the store rather than applied out of band. A machine-readable
+schema for the record of Definition~2 accompanies this paper.
+
+\subsection{Compliance mapping}
+\label{sec:compliance}
+
+Evidence produced for engineering reasons should discharge regulatory obligations without a
+second campaign. Table~\ref{tab:compliance} gives the mapping we propose; the novel element
+is the treatment of model weights as SBOM components, which the CRA's machine-readable SBOM
+requirement \citep{cra} does not contemplate and which no current tooling emits.
+
+\begin{table}[t]
+\small
+\centering
+\begin{tabularx}{\textwidth}{@{}X l X@{}}
+\toprule
+\textbf{Obligation} & \textbf{Instrument} & \textbf{Evidence that discharges it} \\
+\midrule
+Vulnerability and incident reporting & CRA, from 11 Sep 2026 & Cyber-family exposure records with timestamps and disposition \\
+Machine-readable SBOM & CRA, full 11 Dec 2027 & Stack manifest extended with model artifacts: weights hash, training-data provenance class, licence \\
+Security updates over support period & CRA & Release history with per-release gate outcome and update integrity test \\
+ML functions altering behaviour over time & ISO 10218-1:2025 & Functional-family regression record per release, plus adversarial-family results \\
+Application and cell requirements & ISO 10218-2:2025 & Site-scoped evidence bound to $c$ in Definition~1 \\
+Dynamically stable mobile robots & ISO 25785-1 (draft) & Out of scope pending publication; structure anticipated \\
+\bottomrule
+\end{tabularx}
+\caption{Proposed mapping from engineering evidence to regulatory obligation. We produce
+evidence; we do not certify. Certification remains with accredited bodies, and vendor safety
+stacks occupy the functional-safety layer beneath this table.}
+\label{tab:compliance}
+\end{table}
+
+\subsection{Cross-family inference}
+\label{sec:cross}
+
+The composition claim is empirical and testable. We predict three interaction effects that no
+single-family evaluation can express.
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Robustness--competence trade-off.} A checkpoint that improves functional
+  success may increase susceptibility to in-scene injection, if the gain came from stronger
+  instruction-following. Given the per-model spread reported in \citep{paperhijack}---$27.0\%$,
+  $29.4\%$, $5.0\%$---variation of this magnitude across checkpoints of a single model family
+  would be unsurprising and is, to our knowledge, unmeasured.
+  \item \textbf{Degradation-conditioned failure.} Functional failures should concentrate on
+  units whose hardware degradation index exceeds a threshold. Stratifying functional results
+  by hardware state converts unexplained cross-site variance into a maintenance action.
+  \item \textbf{Fidelity--family asymmetry.} A runner's fidelity is family-dependent: a
+  simulator adequate for adversarial scene perturbation may be inadequate for the contact
+  physics of the same task. The framework records fidelity per pair precisely so this
+  asymmetry is representable.
+\end{enumerate}
+
+\section{Metrics and proposed thresholds}
+\label{sec:metrics}
+
+Table~\ref{tab:metrics} collects the metrics the framework requires. Thresholds marked
+\term{proposed} are ours and unvalidated; they are stated numerically so they can be
+falsified rather than debated.
+
+\begin{table}[t]
+\small
+\centering
+\begin{tabularx}{\textwidth}{@{}X r X@{}}
+\toprule
+\textbf{Metric} & \textbf{Threshold} & \textbf{Basis} \\
+\midrule
+Suite fidelity $\rho$: rank correlation between suite and real outcomes over $\ge 8$ historical checkpoints & $\ge 0.80$ & Proposed; anchored to $0.887$--$0.911$ \citep{simfoundry,robosnap} \\
+Rank violation: maximum inversion between suite and real ranking & $\le 0.05$ & Proposed; $0.018$ in \citep{simfoundry}, $0.0066$ in \citep{robosnap} \\
+Verifier balanced accuracy, reported separately for contact-light and contact-heavy tasks & $\ge 0.90$ & Proposed; best published $0.77$ overall, $<0.60$ contact-intensive \citep{failbench} \\
+Attack success rate per category, pre/post mitigation & report & Measured directly; protocol from \citep{paperhijack} \\
+Regression catch rate on known past field regressions & $\ge 0.80$ & Proposed; \S\ref{sec:retro} would establish it \\
+Time-to-evidence: checkpoint availability to complete gate decision & $\le 24$\,h & Proposed; set by release cadence \\
+Test-time compute cost as multiple of base inference & report & Best-of-$N$ at $\approx$2.2\,Hz \citep{cover}; adaptive matches best-of-10 at $34\%$ lower latency \citep{elastic} \\
+\bottomrule
+\end{tabularx}
+\caption{Metrics, with thresholds stated as falsifiable proposals rather than findings.}
+\label{tab:metrics}
+\end{table}
+
+\section{Evaluation protocol for the framework}
+\label{sec:protocol}
+
+A framework of this kind is validated by whether its gate decisions would have been right. We
+specify four studies in increasing cost.
+
+\subsection{Retrospective gate study}
+\label{sec:retro}
+Take a deployed fleet's last $N$ policy checkpoints, their real per-task outcomes, and their
+known field regressions. Construct suites without access to the outcomes, compute $\rho$ per
+suite, apply the gate rule, and report rank correlation, regression catch rate, and
+false-block rate. This is the load-bearing experiment; it requires an industrial partner and
+no new capability.
+
+\subsection{Adversarial pre/post study}
+Instantiate the four attack categories of \citep{paperhijack} against a fixed policy, measure
+attack success, apply a guard layer, and re-measure. Report transfer from simulated to
+physical presentation of the same attack, which is the quantity deciding whether simulated
+adversarial evidence may gate.
+
+\subsection{Cross-family interaction study}
+For a sequence of checkpoints, measure functional success and attack success jointly, and
+stratify functional failures by hardware degradation index. The predictions of
+\S\ref{sec:cross} are either present or absent; either result is informative, and neither has
+been reported.
+
+\subsection{Budget allocation study}
+\label{sec:budget}
+Given a fixed budget of physical-cell hours, compare allocation policies---uniform,
+fidelity-weighted, uncertainty-weighted---on regression catch rate. The relevant baseline is
+random sampling, which falsification work suggests is weak but which industrial practice
+currently approximates \citep{robogate,formalsurvey}.
+
+\section{Open problems}
+\label{sec:open}
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Verifiers on contact-rich tasks.} The functional leg rests on success
+  detection, which is near chance exactly where industrial value concentrates
+  \citep{failbench}. We believe the missing evidence is non-visual---wrist force/torque,
+  joint effort, vacuum pressure, tactile---and that verifier design should be multimodal
+  rather than vision-only. This is a claim, not a result.
+  \item \textbf{Calibrating fidelity cheaply.} Estimating $\rho$ requires historical
+  checkpoints with real outcomes; new deployments have none. Transfer of fidelity estimates
+  across sites and embodiments is unsolved.
+  \item \textbf{Physical parameters.} Every automated real-to-sim pipeline surveyed obtains
+  mass and friction from a language model's prior \citep{simfoundry,robosnap,scanmatsim}.
+  Identification from interaction logs is the obvious alternative and only partially explored
+  \citep{twinaligner,asid}.
+  \item \textbf{Compute budget of verification.} Verification-time scaling improves outcomes
+  substantially but currently at control rates near 2.2\,Hz \citep{cover}; adaptive
+  allocation is promising \citep{elastic} but trains per task.
+  \item \textbf{Standards coverage for learned components.} ISO~10218:2025 acknowledges ML
+  functions but does not specify acceptance evidence for them; ISO~25785-1 is unpublished
+  \citep{iso25785}. That gap is where this framework is intended to be useful, and also why
+  it cannot yet claim regulatory standing.
+  \item \textbf{Privacy as an evidence constraint.} First-person and workplace video is
+  treated as biometric data under GDPR, with anonymisation expected before a dataset leaves
+  the collection site. Evidence sharing between deployer, model provider, and assessor is
+  therefore a data-protection design problem, not only a technical one.
+\end{enumerate}
+
+\section{Limitations}
+
+This paper proposes structure and measures nothing. Its thresholds are guesses with stated
+provenance. The status assignments in Table~\ref{tab:families} are judgements formed from the
+surveyed literature and would shift with a single strong result on contact-rich verification.
+Several industrial figures we cite---actuator fatigue as the binding constraint,
+end-effectors as the most failure-prone subsystem---come from trade and vendor sources rather
+than peer-reviewed work and should be read as practitioner consensus rather than measurement.
+The framework also assumes a release is a discrete event; continuous or per-site online
+adaptation breaks that assumption, and we do not address it.
+
+\section{Conclusion}
+
+Robotics does not lack tests. It lacks a rule for which tests are allowed to stop a release,
+and a place to keep the answer. The four families already exist in the literature; what the
+field has not done is compose them, tag each result with its measured predictive validity,
+and hold the composition against the release decision it is meant to inform. We have
+specified that composition precisely enough to be implemented and argued against, and named
+the one dependency that would make it work or fail: a verifier that can tell, on
+contact-rich tasks, whether the robot actually succeeded.
+
+\subsection*{Reproducibility and artifacts}
+The project page, the LaTeX source of this paper, and a JSON Schema for the evidence record of
+Definition~2 are available in the accompanying repository. No datasets or trained models are
+released, as none were produced.
+
+\bibliography{refs}
+
+\end{document}
